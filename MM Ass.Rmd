@@ -1,0 +1,163 @@
+---
+title: <center><h1>MM Assignment</h1></center>
+author: 
+  <center>River A. Watson</center>
+output: rmdformats::downcute
+        
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+#lapply(packages_needed, require, character.only = TRUE)
+library(ggplot2)
+library(arm)
+library(ggfortify)
+library(AICcmodavg)
+library(grid)
+library(rmdformats)
+library(dplyr)
+library(MASS)
+library(nlme)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+```
+
+## Hierarchical Data
+
+
+
+<br>
+**Data from: Intrasexual competition underlies sexual selection on male breeding coloration in the orangethroat darter, *Etheostoma spectabile* (Zhou & Fuller 2016)**
+
+<br>
+**Male chromatic measurements taken from photographs of each individual. Colors of red, green, and blue were recorded on the cheek, branchiostegal rays, blue in the first dorsal fin, red in the first dorsal fin, blue in the second dorsal fin, red in the second dorsal fin, blue in the anal fin, lateral bar, caudal peduncle spot, and abdomen (10 measurements in total). Each were measured three times per individual.**
+
+**For the sake of this analysis, all measurements were combined into one score**
+
+**Males are categorized as either a "guarder" or a "sneaker" by if they are the first male to breed with a female (guarder) or if they are second+ to breed with the female (sneaker)**
+
+<cemter>
+![](Images\chart.png)
+</center>
+
+
+<br>
+```{r data1, echo=FALSE}
+color.data <- read.csv('data/zhou&fuller_malecomp.csv')
+color.data2 <- read.csv('data/zhou&fuller_threelevel.csv')
+```
+
+```{r plot poisson}
+ggplot(color.data2, aes(group, score, colour = fishid)) + 
+  geom_point(size=5)
+```
+Not the trend you would expect to see based on the papers results
+
+<br>
+<li>run linear mixed model</li>
+```{r lmer}
+fish.model1 <- lmer(score ~ group + (1|fishid), data = color.data2)
+
+summary(fish.model1)
+```
+
+No significant difference between groups
+
+```{r lmer2}
+fish.model2 <- lmer(score ~ (1|group/fishid), data = color.data2)
+
+summary(fish.model2)
+```
+intercept of 2598.57 is is the mean score
+
+<br>
+
+```{r chi}
+
+anova(fish.model1,fish.model2, test = "Chisq")
+```
+<br>
+Which model does a better job/has lower deviance? They're about the same.
+
+
+## Repeated Measures
+
+
+**Measuring seasonal variation in average home range extent (KUD) of *Plectropomus leopardus*, with 34 individuals**
+
+**Data from: Latitudinal and seasonal variation in space use by a large, predatory reef fish, *Plectropomus leopardus* (Scott et al. 2018) **
+
+<center>
+![](Images\gbr.png)
+</center>
+```{r data2, echo=FALSE, warning=FALSE}
+
+kud.data <- read.csv('data/kud_data.csv')
+kud.data2 <- read.csv('data/kud2_data.csv')
+kud.data2$kud95avg <- as.numeric(as.character(kud.data2$kud95avg))
+kud.data2$tag.ID <- as.factor(kud.data2$tag.ID)
+```
+
+```{r, warning=FALSE}
+ggplot(kud.data2, aes(Season, kud95avg, colour = tag.ID)) + 
+  geom_point(size=5)
+```
+```{r plot plot, warning=FALSE}
+ggplot(kud.data2, aes(location, kud95avg, colour = tag.ID)) + 
+  geom_point(size=5)
+```
+
+<br>
+```{r lmer3}
+kud.model <- lmer(kud95avg~location*Season+(1|tag.ID), data = kud.data2)
+#Season is our fixed effect
+```
+
+<br>
+```{r summary2}
+summary(kud.model)
+```
+Not a significant difference between seasons.
+
+<br>
+<ls>Using emmeans for comparisons</ls>
+
+```{r emm}
+kud_emm <- emmeans(kud.model, "Season", "location")
+kud_emm
+```
+```{r emm data}
+data_emm <- as.data.frame(summary(kud_emm))
+data_emm
+```
+
+
+<br>
+```{r}
+ggplot(data_emm, aes(x=Season, y=emmean, group=location, color=location)) + 
+  geom_line() +
+  geom_point(size=4)+
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2)+
+  labs(title="Distance Traveled Per Month (means +/- 1 SE)", x="Month", y = "95%KUD (km2)")
+```
+November-February is summer, May-August is winter.
+There is a difference between seasons, but not a significant one. There is a significant difference between popuations.
+
+<br>
+```{r seasonal contrast between locations}
+#between group contrasts
+pairs(emmeans(kud.model, "location", "Season"))
+```
+
+<br>
+```{r within group}
+#within group contrasts
+pairs(emmeans(kud.model, "Season", "location"))
+
+```
+<center>
+![](Images\gbr.png)
+</center>
